@@ -13,5 +13,6 @@ void enableNVIC_T3(void);
 void enableNVIC_T4(void);
 void setExtInterrupt6ToPC6(void); // vestigal from part 1
 void setExtInterrupt8ToPB8(void);
-
+void setExtInterrupt8And9ToPB(void);
+void EXTI9_5_IRQHandler(void);
 #endif /*__STM32F446XX_INTERRUPTCONTROLLER_MORT_H_*/

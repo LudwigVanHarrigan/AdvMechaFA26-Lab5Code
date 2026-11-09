@@ -1,114 +1,160 @@
 /**
   ******************************************************************************
-  * @file    encoder.c 
-  * @author  
-  * @version 
-  * @date    
+  * @file    encoder.c
   * @brief   Contains the function to be called whenever a pulse is received.
   ******************************************************************************
   */
-  
-#include "stm32f446xx_gpio_mort.h"
-// #include "hardware_stm_gpio.h"
-#include "stupid_delay.h"
+
+#include <stdint.h>
 #include <stdbool.h>
+#include "stm32f446xx_gpio_mort.h"
+#include "stupid_delay.h"
+#include "stm32f446xx_timer_mort.h"
+#include "stm32f446xx_interruptcontroller_mort.h"
+#include "encoder.h"          /* prototypes for everything defined below */
+
 
 // MACROS
-// TODO #define the timer 2 prescale, auto reload register values
-// so they are changable 
-// Also #define COUNTS_PER_SECOND based on these
+#define PRESCALER 8999            // 90MHz / 9000 = 10kHz
+#define AUTO_RELOAD_REGISTER 65535
+#define COUNTS_PER_SECOND 10000  
 
-// alpha value for velocity smoothing
-#define VELOCITY_SMOOTH_ALPHA 0.01
+// alpha value for velocity smoothing 
+#define VELOCITY_SMOOTH_ALPHA 0.01f
 
-// VARIABLES
-bool lastEncoder0Val = false;
-bool lastEncoder1Val = false;
-int32_t encoderCount;
-int32_t velocity;
-int32_t velocitySmooth;
+// VARIABLES 
+volatile bool    lastEncoder0Val = false;
+volatile bool    lastEncoder1Val = false;
+volatile int32_t encoderCount    = 0;
+volatile int32_t velocity        = 0;
+volatile int32_t velocitySmooth  = 0;
+static   float   velocitySmoothF = 0.0f;   // filter state kept as float
 
 
 // METHODS
 
 // Note: we are using pins B8 and B9 for the interrupt pins
-void initEncoderB8B9(){
-    // TODO check the last part of lab 4 for set up interrupts
-    // TODO set up Timer 2 for one shot with specified timeout (see lab4 gummy)
+void initEncoderInterruptsB8B9(void){
 
+    // init pins as inputs
+    initGpioAsInput(PORTB, 8, PULLUP);
+    initGpioAsInput(PORTB, 9, PULLUP);
+
+    // Set up Timer 2 for one shot with specified timeout
+    setT2OneShot(PRESCALER, AUTO_RELOAD_REGISTER);
+
+    lastEncoder0Val = getEncoder0Val() != 0;
+    lastEncoder1Val = getEncoder1Val() != 0;
+
+    // enable interrupt last
+    setExtInterrupt8And9ToPB();
 }
-// TODO call this with EXTI9_5_IRQHandler
-void ISR_B8B9Encoder(){
-    // 1. compare lastEncoder0Val and current Encoder 0 val
-    // (same for encoder 1)
-    // to find direction. (logic tree switch case)
+
+
+// call this from EXTI9_5_IRQHandler
+void ISR_B8B9Encoder(void){
+    //read B8 and B9
+    bool currentEncoder0Val = (getEncoder0Val() != 0);
+    bool currentEncoder1Val = (getEncoder1Val() != 0);
+
+    // compare old AB and new AB to find direction
+    // (A,B) if A changes, it's forward if A!=B after and if B changes, it's forward if A=B after.
+    uint32_t index = (lastEncoder0Val << 3) | (lastEncoder1Val << 2) |
+                     (currentEncoder0Val << 1) | (currentEncoder1Val);
+    int32_t step = 0;                 // signed: it holds +1 / -1
+
+    switch (index){
+        case 0b0010:
+        case 0b1011:
+        case 0b1101:
+        case 0b0100:
+            step = 1;
+            break;
+
+        case 0b0001:
+        case 0b0111:
+        case 0b1110:
+        case 0b1000:
+            step = -1;
+            break;
+
+        default: // no change or both A and B change
+            step = 0;
+            break;
+    }
 
     // Based on direction:
+    if (step != 0){
         // 1. Increment or decrement position
+        encoderCount += step;
 
         // 2. update velocity
-        if(!isVelocityTimedOut()){ // If velocity timer is still running
+        if (!isVelocityTimedOut()){ // If velocity timer is still running
             // Set velocity based on elapsed time
+            int32_t v = (int32_t)unsignedVelocityTicksPerSecond() * step;
+            velocity = v;
             // Update smoothed velocity
+            velocitySmoothF += VELOCITY_SMOOTH_ALPHA * ((float)v - velocitySmoothF);
+            velocitySmooth = (int32_t)velocitySmoothF;
         }
+
         // 3. Reset and start encoder timer
         startEncoderTimer();
-
-    // Finally, update lastEncoder0Val and lastEncoder1Val.
-    // (boolean values for the encoder lines to check direction next loop)
-
-
-} 
+    }
+    // Finally, update the last values for the next edge
+    lastEncoder0Val = currentEncoder0Val;
+    lastEncoder1Val = currentEncoder1Val;
+}
 
 
 // Convenience functions
-void getEncoder0Val(){
-    // Check pin 8
-    checkGpioPin(PORTB, 8); // requires gpio_mort
+uint32_t getEncoder0Val(void){
+    return checkGpioPin(PORTB, 8);
 }
-void getEncoder1Val(){
-    // TODO Value of pin B9
-}
-
-uint32_t unsignedVelocityTicksPerSecond(){
-    // Get timer 2 CNT value
-    // 
-    // Return COUNTS_PER_SECOND / TIM2_CNT
-    // = encoder ticks per second
+uint32_t getEncoder1Val(void){
+    return checkGpioPin(PORTB, 9);
 }
 
- // Zeroes encoder position and all velocity measurements. Also resets step timer.
+uint32_t unsignedVelocityTicksPerSecond(void){
+    uint32_t cnt = T2CNT();
 
-void zeroEncoder(){
+    //to avoid dividing with 0
+    if (cnt == 0){
+        cnt = 1;
+    }
+
+    // encoder edges per second
+    return COUNTS_PER_SECOND / cnt;
+}
+
+// Zeroes encoder position and all velocity measurements. Also resets step timer.
+void zeroEncoder(void){
     encoderCount = 0;
     velocity = 0;
     velocitySmooth = 0;
-    // TODO Reset and start encoder timer
+    velocitySmoothF = 0.0f;
+    startEncoderTimer();
 }
 
-bool isVelocityTimedOut(){
-    // Check TIM2 OVF bit.
-    return false;
+bool isVelocityTimedOut(void){
+    return isT2Overflowed();
 }
 
-void startEncoderTimer(){
-    // TODO look at lab 4 gummy machine to figure out how to do this
-    // FIRST stop and reset the timer
-    // CEN bit??
-    // Do we need to clear the overflow (OVF) bit?
+void startEncoderTimer(void){
+    startT2();
 }
 
 // Getters
-// Returns encoder count number
-uint32_t getEncoderCount();{
+int32_t getEncoderCount(void){
     return encoderCount;
 }
-// Returns encoder velocity
-uint32_t getEncoderVelocity(){
-    return velocity;
+int32_t getEncoderVelocity(void){
+    return isVelocityTimedOut() ? 0 : velocity;   // stopped motor reads 0
 }
-uint32_t getSmoothEncoderVelocity(){
+int32_t getSmoothEncoderVelocity(void){
+    if (isVelocityTimedOut()){
+        velocitySmoothF = 0.0f;
+        velocitySmooth = 0;
+    }
     return velocitySmooth;
 }
-
-//

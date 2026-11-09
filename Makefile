@@ -26,7 +26,8 @@ C_SOURCES = main.c \
 			hardware/stm32f446xx_adc_mort.c \
 			stupid_delay.c \
 			A2.c \
-			P2.c
+			P2.c \
+			encoder.c
 
 # Your assembly startup file
 S_SOURCES = startup_stm32f4xx.s

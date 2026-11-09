@@ -10,7 +10,7 @@
 #include "stm32f446xx_interruptcontroller_mort.h"
 #include "stm32f446xx_gpio_mort.h"
 #include "stm32f446xx_rcc_mort.h"
-
+#include "encoder.h"
 
 
 /* MACRO definitions----------------------------------------------------------*/
@@ -53,6 +53,10 @@
 #define EXTI_RTSR_TR8               ((uint32_t)0x100) // Rising trigger selection register (pg.248)
 #define EXTI_PR_PR8                 ((uint32_t)0x100) // Pending register (pg. 249)
 
+#define EXTI_FTSR_REGISTER       (EXTI_BASE_ADDRESS + 0x0C)   // Falling Trigger Selection
+#define SYSCFG_EXTICR3_8_9_BITS  ((uint32_t)0x0FF)            // clears EXTI8 and EXTI9 fields
+#define SYSCFG_EXTICR3_8_9_PORTB ((uint32_t)0x011)            // EXTI8 = PB, EXTI9 = PB
+#define EXTI_LINES_8_9           ((uint32_t)0x300)            // bits 8 and 9
 // FLAGS:
 
 /* function definitions-------------------------------------------------------*/
@@ -131,8 +135,45 @@ void setExtInterrupt8ToPB8(void){
   // TODO is this the right thing to enable?
 }
 
+void setExtInterrupt8And9ToPB(void){
+  uint32_t *reg_pointer;
 
+  // 1. Enable the SYSCFG clock
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 
+  // set EXTI8 and EXTI9 to PortB
+  reg_pointer = (uint32_t *)SYSCFG_EXTICR3_REGISTER;
+  *reg_pointer = *reg_pointer & (~SYSCFG_EXTICR3_8_9_BITS);
+  *reg_pointer = *reg_pointer | SYSCFG_EXTICR3_8_9_PORTB;
 
+  //trigger on both rising and falling edges
+  reg_pointer = (uint32_t *)EXTI_RTSR_REGISTER;
+  *reg_pointer = *reg_pointer | EXTI_LINES_8_9;
+  reg_pointer = (uint32_t *)EXTI_FTSR_REGISTER;
+  *reg_pointer = *reg_pointer | EXTI_LINES_8_9;
+
+  //Clear any stale pending bits (write 1 to clear)
+  reg_pointer = (uint32_t *)EXTI_PR_REGISTER;
+  *reg_pointer = EXTI_LINES_8_9;
+
+  //Unmask the two lines
+  reg_pointer = (uint32_t *)EXTI_IMR_REGISTER;
+  *reg_pointer = *reg_pointer | EXTI_LINES_8_9;
+
+  // Enable EXTI9_5 in the NVIC
+  reg_pointer = (uint32_t *)NVIC_INTERRUPT_SET_ENABLE_REGISTER_0_31;
+  *reg_pointer = EXTI9_5_INTERRUPT_BIT;
+
+}
+
+void EXTI9_5_IRQHandler(void){
+  uint32_t *pr = (uint32_t *)EXTI_PR_REGISTER;
+  uint32_t pending = *pr & EXTI_LINES_8_9;
+
+  if (pending){
+    *pr = pending;          // clear only the bits we saw (write 1 to clear)
+    ISR_B8B9Encoder();
+  }
+}
 
 //EOF

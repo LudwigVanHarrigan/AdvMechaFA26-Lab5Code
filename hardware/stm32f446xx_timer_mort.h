@@ -70,6 +70,64 @@
 #define GPIO_6_AFR1                 0xF000000
 #define GPIO_6_AFR1_AF2             0x2000000 //good?
 
+// TIMER 2 STUFF (32-bit timer, same register layout as TIM3)
+#define TIM2_BASE_ADDRESS       ((uint32_t)0x40000000)
+#define TIM2_CR1_REGISTER       (TIM2_BASE_ADDRESS + 0x00)
+#define TIM2_CR2_REGISTER       (TIM2_BASE_ADDRESS + 0x04)
+#define TIM2_SMCR_REGISTER      (TIM2_BASE_ADDRESS + 0x08)
+#define TIM2_DIER_REGISTER      (TIM2_BASE_ADDRESS + 0x0C)
+#define TIM2_SR_REGISTER        (TIM2_BASE_ADDRESS + 0x10)
+#define TIM2_EGR_REGISTER       (TIM2_BASE_ADDRESS + 0x14)
+#define TIM2_CCMR1_REGISTER     (TIM2_BASE_ADDRESS + 0x18)
+#define TIM2_CCMR2_REGISTER     (TIM2_BASE_ADDRESS + 0x1C)
+#define TIM2_CCER_REGISTER      (TIM2_BASE_ADDRESS + 0x20)
+#define TIM2_CNT_REGISTER       (TIM2_BASE_ADDRESS + 0x24)
+#define TIM2_PSC_REGISTER       (TIM2_BASE_ADDRESS + 0x28)
+#define TIM2_ARR_REGISTER       (TIM2_BASE_ADDRESS + 0x2C)
+#define TIM2_CCR1_REGISTER      (TIM2_BASE_ADDRESS + 0x34)
+#define TIM2_CCR2_REGISTER      (TIM2_BASE_ADDRESS + 0x38)
+#define TIM2_CCR3_REGISTER      (TIM2_BASE_ADDRESS + 0x3C)
+#define TIM2_CCR4_REGISTER      (TIM2_BASE_ADDRESS + 0x40)
+#define TIM2_DCR_REGISTER       (TIM2_BASE_ADDRESS + 0x48)
+#define TIM2_DMAR_REGISTER      (TIM2_BASE_ADDRESS + 0x4C)
+
+// Individual bits for those registers
+#define TIM2_CR1_CEN            ((uint32_t)0b01)
+#define TIM2_CR1_CEN_ENABLE     ((uint32_t)0b01)
+#define TIM2_CR1_OPM            ((uint32_t)0b1000)   // pg. 558
+#define TIM2_CR1_OPM_ENABLE     ((uint32_t)0b1000)   // pg. 558
+
+#define TIM2_EGR_UG             ((uint32_t)0b01)     // force update event
+
+#define TIM2_DIER_UIE_ENABLE    ((uint32_t)0b01)
+#define TIM2_DIER_CC3IE_ENABLE  ((uint32_t)0b01 << 3)
+
+#define TIM2_SR_UIF             ((uint32_t)0b01)
+#define TIM2_SR_CC1IF           ((uint32_t)0b01 << 1)
+#define TIM2_SR_CC3IF           ((uint32_t)0b01 << 3)
+
+#define TIM2_CCMR1_CC1          ((uint32_t)0b11111111)          // Resets entire CCMR1 register for channel 1
+#define TIM2_CCMR1_CC1S_IN_TI1  ((uint32_t)0b01)
+
+#define TIM2_CCMR1_CC2          ((uint32_t)0b1111111100000000)  // Resets entire CCMR1 register for channel 2
+#define TIM2_CCMR1_CC2S_OUT     ((uint32_t)0b00 << 0)           // pg. 567
+#define TIM2_CCMR1_OC2M_PWM     ((uint32_t)0b111 << 12)
+#define TIM2_CCMR1_OC2PE_ENABLE ((uint32_t)0b01 << 11)
+
+#define TIM2_CCMR2_CC3          ((uint32_t)0b11111111)          // Resets entire CCMR2 register for CC3
+#define TIM2_CCMR2_CC3S_OUT     ((uint32_t)0b00)
+#define TIM2_CCMR2_OC3M_TOGGLE  ((uint32_t)0b011 << 4)
+#define TIM2_CCMR2_OC3M_PWM     ((uint32_t)0b111 << 4)
+#define TIM2_CCMR2_OC3M_FROZEN  ((uint32_t)0b000 << 4)
+#define TIM2_CCMR2_OC3PE_ENABLE ((uint32_t)0b01 << 3)
+
+#define TIM2_CCER_CC1E          ((uint32_t)0b1011)              // Reset all CC1 stuff
+#define TIM2_CCER_CC1E_ENABLE   ((uint32_t)0b01)
+#define TIM2_CCER_CC2E          ((uint32_t)0b1011 << 4)         // Reset all CC2 stuff
+#define TIM2_CCER_CC2E_ENABLE   ((uint32_t)0b01 << 4)
+#define TIM2_CCER_CC3E          ((uint32_t)0b01 << 8)
+#define TIM2_CCER_CC3E_ENABLE   ((uint32_t)0b01 << 8)
+
 // TIMER 3 STUFF
 // See TIMx Register Map on page 579-580
 #define TIM3_BASE_ADDRESS (uint32_t)0x40000400
@@ -201,5 +259,18 @@ void initT3C2PWM(void);
 
 // Set the duty cycle (0-1000) of the T3C2 PWM output
 void setT3C2PWM(uint16_t duty);
+
+//set timer2 as one shot without starting it
+void setT2OneShot(uint32_t prescaler, uint32_t period);
+
+//return timer 2 count
+uint32_t T2CNT(void);
+
+//check if timer 2 overflowed
+uint32_t isT2Overflowed(void);
+
+//start timer2
+void startT2(void);
+
 
 #endif /*__STM32F446XX_TIMER_H_*/

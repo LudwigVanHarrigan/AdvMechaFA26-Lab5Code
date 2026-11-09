@@ -279,4 +279,62 @@ void setT3C2PWM(uint16_t duty){
   // Since we enabled preload register, we can set this on the fly.
 
 }
+
+void setT2OneShot(uint32_t prescaler, uint32_t period){
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    volatile uint32_t *reg_pointer;
+
+    //disable timer by setting CEN to 0
+    reg_pointer = (uint32_t *)TIM2_CR1_REGISTER;
+    *reg_pointer = *reg_pointer & 0x00;
+
+    //upload the prescaler value to TIM2_PSC
+    reg_pointer = (uint32_t *)TIM2_PSC_REGISTER;
+    *reg_pointer = prescaler;
+
+    //set the wanted period value to the autoreload register TIM2_ARR
+    reg_pointer = (uint32_t *)TIM2_ARR_REGISTER;
+    *reg_pointer = period;
+
+    //set one pulse mode to TIM2 by writing 1 to bit3 of TIM2_CR1
+    reg_pointer = (uint32_t *)TIM2_CR1_REGISTER;
+    *reg_pointer = *reg_pointer | TIM2_CR1_OPM;
+
+    //load PSC and ARR now
+    reg_pointer = (uint32_t *)TIM2_EGR_REGISTER;
+    *reg_pointer = *reg_pointer | TIM2_EGR_UG;
+
+    //clear the UIF that UG set
+    reg_pointer = (uint32_t *)TIM2_SR_REGISTER;
+    *reg_pointer = 0;
+
+}
+
+uint32_t T2CNT(void){
+  uint32_t *reg_pointer = (uint32_t *)TIM2_CNT_REGISTER;
+  return *reg_pointer;
+}
+
+uint32_t isT2Overflowed(void){
+  uint32_t *reg_pointer;
+  reg_pointer = (uint32_t *)TIM2_SR_REGISTER;
+  return (*reg_pointer & TIM2_SR_UIF) != 0;
+}
+
+void startT2(void){
+  uint32_t *reg_pointer;
+  // stop the timer by clearing CEN bit of CR1 register
+  reg_pointer = (uint32_t *)TIM2_CR1_REGISTER;
+  *reg_pointer = *reg_pointer & (~TIM2_CR1_CEN);
+  // reset the timer
+  reg_pointer = (uint32_t *)TIM2_CNT_REGISTER;
+  *reg_pointer = 0;
+  // clear overflow flag
+  reg_pointer = (uint32_t *)TIM2_SR_REGISTER;
+  *reg_pointer = ~TIM2_SR_UIF;
+  // start timer
+  reg_pointer = (uint32_t *)TIM2_CR1_REGISTER;
+  *reg_pointer = *reg_pointer | TIM2_CR1_CEN_ENABLE;
+}
 //EOF

@@ -1,20 +1,24 @@
 #ifndef __ENCODER_H_
 #define __ENCODER_H_
 
-
-
 /* Includes ------------------------------------------------------------------*/
-
-
-/* Macros for Everyone--------------------------------------------------------*/
+#include <stdint.h>
+#include <stdbool.h>
 
 /*Function definitions---------------------------------------------------------*/
-void delay(volatile int count);
+void     initEncoderInterruptsB8B9(void);
+void     ISR_B8B9Encoder(void);          // Called by EXTI9_5_IRQHandler
 
-void initEncoderInterruptsB8B9();
-void ISR_B8B9Encoder(); // Will get called by EXTI ISR
-uint32_t getEncoderCount(); // Returns encoder count number
-uint32_t getEncoderVelocity(); // Returns encoder velocity
-void zeroEncoder(); // Zeroes encoder position and all velocity measurements. Also resets step timer.
+int32_t  getEncoderCount(void);          // Signed position in edges
+int32_t  getEncoderVelocity(void);       // Signed edges per second
+int32_t  getSmoothEncoderVelocity(void); // Filtered version
+void     zeroEncoder(void);              // Zeroes position and velocity, resets step timer
+
+// helpers used inside encoder.c
+uint32_t getEncoder0Val(void);
+uint32_t getEncoder1Val(void);
+uint32_t unsignedVelocityTicksPerSecond(void);
+bool     isVelocityTimedOut(void);
+void     startEncoderTimer(void);
 
 #endif /*__ENCODER_H_ */
