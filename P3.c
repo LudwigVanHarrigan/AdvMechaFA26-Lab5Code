@@ -38,8 +38,8 @@ void P2 (void)
     // Set up F7,8,9 as analog
     initADC3_567_withDMA(); // Initialize adc3 channel 5,6,7
     // Set up B8 and B9 as output
-    initGpioAsOutput(PORTB, 8);
-    initGpioAsOutput(PORTB, 9);
+    initGpioAsOutput(PORTB, 3);
+    initGpioAsOutput(PORTA, 4);
     // Set up PWM on T3C2 and enable the connected alternate function pin
     initT3C2PWM();
     initGpioAsAF2(PORTB, 5, NOPULL);
