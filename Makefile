@@ -27,7 +27,9 @@ C_SOURCES = main.c \
 			stupid_delay.c \
 			A2.c \
 			P2.c \
-			encoder.c
+			P3.c \
+			encoder.c \
+			motor_control.c
 
 # Your assembly startup file
 S_SOURCES = startup_stm32f4xx.s

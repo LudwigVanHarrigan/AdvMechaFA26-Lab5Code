@@ -12,15 +12,16 @@
 #include "stm32f446xx_timer_mort.h"
 #include "stm32f446xx_interruptcontroller_mort.h"
 #include "encoder.h"          /* prototypes for everything defined below */
+#include "stm32f446xx_usart3_mort.h" //always include usart where you want to do communications
 
 
 // MACROS
 #define PRESCALER 8999            // 90MHz / 9000 = 10kHz
-#define AUTO_RELOAD_REGISTER 65535
+#define AUTO_RELOAD_REGISTER 1000 // More than 0.1s between pulses -> velocity = 0
 #define COUNTS_PER_SECOND 10000  
 
 // alpha value for velocity smoothing 
-#define VELOCITY_SMOOTH_ALPHA 0.01f
+#define VELOCITY_SMOOTH_ALPHA 0.2f
 
 // VARIABLES 
 volatile bool    lastEncoder0Val = false;
@@ -54,6 +55,8 @@ void initEncoderInterruptsB8B9(void){
 // call this from EXTI9_5_IRQHandler
 void ISR_B8B9Encoder(void){
     //read B8 and B9
+
+
     bool currentEncoder0Val = (getEncoder0Val() != 0);
     bool currentEncoder1Val = (getEncoder1Val() != 0);
 

@@ -14,13 +14,15 @@
 // #include "main.h"
 #include "A2.h"
 #include "P2.h"
+#include "P3.h"
 
 
 
 int main (void)
 {
  // A2(); // Continuous conversion of three ADC values
-  P2();
+  // P2();
+  P3();
 }
 
 

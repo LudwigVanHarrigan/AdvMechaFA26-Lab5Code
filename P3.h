@@ -1,7 +1,7 @@
-#ifndef __P2_H_
-#define __P2_H_
+#ifndef __P3_H_
+#define __P3_H_
 
 /*Function definitions---------------------------------------------------------*/
-void P2(void);
+void P3(void);
 
-#endif /*__P2_H */
+#endif /*__P3_H */

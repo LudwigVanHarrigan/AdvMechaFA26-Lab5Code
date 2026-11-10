@@ -18,7 +18,7 @@
 // EXTI9-5 is its own interrupt handler. Use B9 and B8 for interrupts
 
   
-#include "P2.h"
+#include "P3.h"
 
 #include "stm32f446xx_gpio_mort.h"
 #include "stm32f446xx_timer_mort.h"
@@ -27,43 +27,101 @@
 #include "stm32f446xx_system_mort.h"
 #include "stm32f446xx_usart3_mort.h" //always include usart where you want to do communications
 #include "stupid_delay.h"
+#include "encoder.h"
+#include "motor_control.h"
 
 
 
-void P2 (void)
+void P3 (void)
 {
     /* Variables*/
     /* Initializations */
     initUSART3(); //always init USART if you want communication!
-    // Set up F7,8,9 as analog
-    initADC3_567_withDMA(); // Initialize adc3 channel 5,6,7
-    // Set up B8 and B9 as output
-    initGpioAsOutput(PORTB, 3);
-    initGpioAsOutput(PORTA, 4);
-    // Set up PWM on T3C2 and enable the connected alternate function pin
-    initT3C2PWM();
-    initGpioAsAF2(PORTB, 5, NOPULL);
+
+    // Initialize encoder stuffs
+    // initEncoderInterruptsB8B9();
+
+    // Initialize pushbutton
+    initGpioAsInput(PORTD, 1, PULLUP);
+
+    // Initialize the motor controller (and by corollary the encoder)
+    initMotorPosControl();
+
+    // Set the proportional gain
+    setKp(50.0f);
+    setKd(1.1f);
+
     delay(80000); //give some time for USART to come alive.
     transmitLineUSART3("USART3 is alive!");
-    delay(800000); //give some time for ADC to wake up from deeeep slumber
-        startADCConversion(); // Turn on the ADC (SWSTART)
-    uint32_t adcValue; //uint32_t so we can multiply it by 1000 later
+    delay(800000); //Vestigal ADC wait time
+    enableController(); // Start controlling with P controller
 
 
-    // Set motor direction
-    setGpioPin(PORTB, 8);
-    clearGpioPin(PORTB, 9);
+    // State tracking
+    typedef enum {
+        POS1,
+        POS1_db,
+        POS2,
+        POS2_db,
+    }state_t;
+    state_t state = POS1;
+
+
     while(1)
     {
-        // Nab the ADC value
-        adcValue = returnADC3StoredValue(0); // Pin F7
+        delay(80000);
+        // Very very simple state machine. Runs slowly(tm)
+        // for "dumb debounce"
+        switch (state){
+            case POS1:
+                // position target is 0.
 
-        // Convert the 0-4095 to 0-1000 for PWM function
-        adcValue = (adcValue*1000)/4095; // This order works best for precision
+                // Trigger: button is pressed
+                if(checkGpioPin(PORTD, 1) == 0){
+                    // Go to debounce state
+                    state = POS1_db;
+                }
 
-        // Apply this (0-1000) value directly to the pwm
-        // setT3C2PWM(adcValue);
-        setT3C2PWM(adcValue);
+            break;
+            case POS1_db:  
+                // Debounce button.
+
+                // Trigger: button is released
+                if(checkGpioPin(PORTD, 1) > 0){
+                    // Go to POS2
+                    state = POS2;
+                    // Set position target to 90 degrees
+                    //48*4.4 = 211.2 counts per revolution
+                    // 211.2/4 = about 53
+                    setPositionTarget(53);
+                    transmitLineUSART3("Setting position to 90 degrees");
+
+                }                
+            break;
+            case POS2:
+
+                // Trigger: button is pressed
+                if(checkGpioPin(PORTD, 1) == 0){
+                    // Go to debounce state
+                    state = POS2_db;
+                }
+                
+            break;
+            case POS2_db:
+                // Trigger: button is released
+                if(checkGpioPin(PORTD, 1) > 0){
+                    // Go to POS2
+                    state = POS1;
+                    // Set position target to 90 degrees
+                    setPositionTarget(0);
+                    transmitLineUSART3("Setting position to 0 degrees");
+                } 
+            break;
+
+
+
+
+        }
 
 
     }

@@ -8,9 +8,11 @@
 
 /* Includes----------------------------------------------------------*/
 #include "stm32f446xx_interruptcontroller_mort.h"
+#include "stm32f446xx_timer_mort.h"
 #include "stm32f446xx_gpio_mort.h"
 #include "stm32f446xx_rcc_mort.h"
 #include "encoder.h"
+#include "motor_control.h"
 
 
 /* MACRO definitions----------------------------------------------------------*/
@@ -166,6 +168,8 @@ void setExtInterrupt8And9ToPB(void){
 
 }
 
+// IRQ Handlers!!
+
 void EXTI9_5_IRQHandler(void){
   uint32_t *pr = (uint32_t *)EXTI_PR_REGISTER;
   uint32_t pending = *pr & EXTI_LINES_8_9;
@@ -174,6 +178,32 @@ void EXTI9_5_IRQHandler(void){
     *pr = pending;          // clear only the bits we saw (write 1 to clear)
     ISR_B8B9Encoder();
   }
+}
+
+void TIM4_IRQHandler(void){
+  // 1. check which flag was raised
+  volatile uint16_t * reg_pointer_16_sr; // for status register
+  volatile uint16_t * reg_pointer_16_dier; // For interrupt enable register
+  reg_pointer_16_sr = (uint16_t *)TIM4_SR_REGISTER;
+  reg_pointer_16_dier = (uint16_t *)TIM4_DIER_REGISTER;
+
+  // Was it output compare 3?
+  if(((*reg_pointer_16_sr & TIM4_SR_CC3IF) >0) &&((*reg_pointer_16_dier & TIM4_DIER_CC3IE_ENABLE)>0)){
+    // Clear it
+    *reg_pointer_16_sr = ~((uint16_t)TIM4_SR_CC3IF);
+    // Action
+    // We don't really care about output compare 3
+  }
+  // Was it timer 4 overflow?
+    if(((*reg_pointer_16_sr & TIM4_SR_UIF) >0) &&((*reg_pointer_16_dier & TIM4_DIER_UIE_ENABLE)>0)){
+    // Clear it
+    *reg_pointer_16_sr = ~((uint16_t)TIM4_SR_UIF);
+    // Action
+    // Update the motor position control loop (roughly 1000hz)
+    updateMotorControl();
+
+  }
+
 }
 
 //EOF
